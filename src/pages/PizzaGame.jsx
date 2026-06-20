@@ -131,21 +131,6 @@ export default function PizzaGame() {
   const [dismissedOrders, setDismissedOrders] = useState(() => new Set())
   const scheduledRef = useRef(new Set())
 
-  const metrics = useMemo(() => {
-    const st = simState?.stations ?? []
-    const wip = st.reduce((a, s) => a + s.occupants.length, 0)
-    const { profit, wipCost, net } = computeScore(simState?.pizzas ?? [], simState?.delivered ?? 0)
-    return {
-      delivered: simState?.delivered ?? 0,
-      wip,
-      profit,
-      wipCost,
-      net,
-      avgLeadTime: (simState?.delivered ?? 0) > 0 ? simState.leadSum / simState.delivered : null,
-      elapsed: simState?.t ?? 0,
-    }
-  }, [simState])
-
   const {
     simState,
     round,
@@ -166,6 +151,21 @@ export default function PizzaGame() {
     applyRedeploy,
     revertRedeploy,
   } = usePizzaSim(1)
+
+  const metrics = useMemo(() => {
+    const st = simState?.stations ?? []
+    const wip = st.reduce((a, s) => a + s.occupants.length, 0)
+    const { profit, wipCost, net } = computeScore(simState?.pizzas ?? [], simState?.delivered ?? 0)
+    return {
+      delivered: simState?.delivered ?? 0,
+      wip,
+      profit,
+      wipCost,
+      net,
+      avgLeadTime: (simState?.delivered ?? 0) > 0 ? simState.leadSum / simState.delivered : null,
+      elapsed: simState?.t ?? 0,
+    }
+  }, [simState])
 
   useEffect(() => {
     if (!mountRef.current) return
