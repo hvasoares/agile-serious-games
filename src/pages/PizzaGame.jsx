@@ -447,7 +447,7 @@ export default function PizzaGame() {
                   return (
                     <div key={i} style={{
                       marginBottom: 8,
-                      opacity: reached || i === 0 ? 1 : 0.45,
+                      opacity: reached || constraintKey ? 1 : 0.45,
                       borderLeft: `2px solid ${reached ? '#e0a24b' : '#2a201a'}`,
                       paddingLeft: 8,
                     }}>
