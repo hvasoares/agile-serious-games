@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import GameLayout from '../components/GameLayout.jsx'
 import { PizzaScene } from '../scenes/pizzaScene.js'
 import { usePizzaSim, getCoachingMessage } from '../hooks/usePizzaSim.js'
@@ -6,6 +6,7 @@ import { ROUND_DEFS, TOC_STEPS, STATION_DEFS, findIdlestDonor } from '../sim/piz
 import { getBacklogOrders, getDoingOrders, getDoneOrders } from '../sim/orderSorting.js'
 import CfdChart from '../components/CfdChart.jsx'
 import LineChart from '../components/LineChart.jsx'
+import { computeScore } from '../sim/metrics.js'
 
 const STATION_COLORS = ['#e0a24b', '#d8442a', '#e58aa6', '#caa05a', '#7cb342']
 
@@ -130,16 +131,20 @@ export default function PizzaGame() {
   const [dismissedOrders, setDismissedOrders] = useState(() => new Set())
   const scheduledRef = useRef(new Set())
 
-  const [metrics, setMetrics] = useState({
-    delivered: 0,
-    wip: 0,
-    profit: 0,
-    wipCost: 0,
-    net: 0,
-    avgLeadTime: '—',
-    elapsed: 0,
-    stationStats: [],
-  })
+  const metrics = useMemo(() => {
+    const st = simState?.stations ?? []
+    const wip = st.reduce((a, s) => a + s.occupants.length, 0)
+    const { profit, wipCost, net } = computeScore(simState?.pizzas ?? [], simState?.delivered ?? 0)
+    return {
+      delivered: simState?.delivered ?? 0,
+      wip,
+      profit,
+      wipCost,
+      net,
+      avgLeadTime: (simState?.delivered ?? 0) > 0 ? simState.leadSum / simState.delivered : null,
+      elapsed: simState?.t ?? 0,
+    }
+  }, [simState])
 
   const {
     simState,
@@ -164,7 +169,7 @@ export default function PizzaGame() {
 
   useEffect(() => {
     if (!mountRef.current) return
-    const scene = new PizzaScene(mountRef.current, { onUpdate: setMetrics })
+    const scene = new PizzaScene(mountRef.current)
     sceneRef.current = scene  // registers with the hook's RAF loop
     scene.loadRound(1, simState)  // initialize cap labels with correct values
 
@@ -215,9 +220,7 @@ export default function PizzaGame() {
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
-  const stations = metrics.stationStats?.length
-    ? metrics.stationStats
-    : simState?.stations ?? []
+  const stations = simState?.stations ?? []
 
   const chartHistory = simState?.chartHistory ?? []
   const leadTimeSeries = [{ data: chartHistory.map(p => ({ t: p.t, value: p.avgLeadTime })), color: '#2f8fd6', label: 'Avg Lead Time (s)' }]
