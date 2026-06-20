@@ -19,6 +19,8 @@ export function usePizzaSim(initialRound = 1) {
   const runningRef = useRef(false)
   const roundRef = useRef(initialRound)
   const loopRef = useRef(null)
+  // Persists each round's state across round switches so switching back restores progress
+  const savedRoundStatesRef = useRef({ [initialRound]: simState })
 
   // ── RAF loop ──────────────────────────────────────────────────────────────
   const loop = useCallback((now) => {
@@ -76,13 +78,16 @@ export function usePizzaSim(initialRound = 1) {
     animIdRef.current = null
     lastTRef.current = null
     const fresh = freshSim(roundRef.current)
+    savedRoundStatesRef.current[roundRef.current] = fresh
     simStateRef.current = fresh
     setSimState(fresh)
     if (sceneRef.current) sceneRef.current.loadRound(roundRef.current, fresh)
   }, [])
 
   const setRound = useCallback((num) => {
-    const wasRunning = runningRef.current
+    // Save current round's state before switching
+    savedRoundStatesRef.current[roundRef.current] = simStateRef.current
+
     runningRef.current = false
     setRunning(false)
     cancelAnimationFrame(animIdRef.current)
@@ -92,18 +97,13 @@ export function usePizzaSim(initialRound = 1) {
     roundRef.current = num
     setRoundState(num)
 
-    const fresh = freshSim(num)
-    simStateRef.current = fresh
-    setSimState(fresh)
+    // Restore saved state for the target round, or start fresh if never visited
+    const restored = savedRoundStatesRef.current[num] ?? freshSim(num)
+    simStateRef.current = restored
+    setSimState(restored)
 
-    if (sceneRef.current) sceneRef.current.loadRound(num, fresh)
-
-    if (wasRunning) {
-      runningRef.current = true
-      setRunning(true)
-      animIdRef.current = requestAnimationFrame(loop)
-    }
-  }, [loop])
+    if (sceneRef.current) sceneRef.current.loadRound(num, restored)
+  }, [])
 
   const setWipLimit = useCallback((stationIndex, value) => {
     const current = simStateRef.current
