@@ -142,8 +142,6 @@ export default function PizzaGame() {
     pause,
     reset,
     setWipLimit,
-    tocNext,
-    tocPrev,
     setToc,
     setShowCfd,
     applyTocStep,
@@ -178,7 +176,7 @@ export default function PizzaGame() {
       window.removeEventListener('resize', onResize)
       scene.dispose?.()
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount-only: sceneRef is a stable ref, simState used only for initial label setup
 
   // Detect newly completed orders → blink then remove
   useEffect(() => {
@@ -195,6 +193,7 @@ export default function PizzaGame() {
   // Clear dismissed state when sim resets (orderCounter back to 0)
   useEffect(() => {
     if ((simState?.orderCounter ?? 0) === 0 && (simState?._nextId ?? 0) === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: syncing dismissed set to sim reset
       setDismissedOrders(new Set())
       scheduledRef.current = new Set()
     }
