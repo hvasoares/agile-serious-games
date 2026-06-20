@@ -78,7 +78,15 @@ export function usePizzaSim(initialRound = 1) {
     animIdRef.current = null
     lastTRef.current = null
     const current = simStateRef.current
-    const fresh = current.toc ? resetSimData(current) : freshSim(roundRef.current)
+    const base = current.toc ? resetSimData(current) : freshSim(roundRef.current)
+    // Preserve the WIP caps the player set — only reset pizzas/time/history
+    const fresh = {
+      ...base,
+      stations: base.stations.map((st, i) => ({
+        ...st,
+        cap: current.stations[i]?.cap ?? st.cap,
+      })),
+    }
     savedRoundStatesRef.current[roundRef.current] = fresh
     simStateRef.current = fresh
     setSimState(fresh)
