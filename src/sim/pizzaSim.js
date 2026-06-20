@@ -26,12 +26,12 @@ export const ROUND_DEFS = [
   {
     title: 'Pull Discipline',
     mode: 'pull',
-    caps: [2, 2, 2, 3, 2],
+    caps: [2, 2, 2, 3, 6],
   },
   {
     title: 'Theory of Constraints',
     mode: 'pull',
-    caps: [2, 2, 3, 3, 2],
+    caps: [2, 2, 3, 3, 6],
   },
 ];
 
@@ -105,6 +105,8 @@ export function freshSim(roundNum) {
     exploit: false,
     subordinate: false,
     elevated: false,
+    redeployed: false,
+    elevatedFrom: -1,
     spawnInterval: SPAWN_INTERVAL,
     constraintHistory: [],
     _nextId: 0,
@@ -457,6 +459,7 @@ export function applyTocAction(state, stepIndex) {
       subordinate = false;
       elevated = false;
       spawnInterval = SPAWN_INTERVAL;  // reset demand for next cycle
+      // redeploy resets handled by revertElevateRedeploy if applied; no extra work needed here
       break;
     }
 
@@ -513,4 +516,99 @@ export function revertTocAction(state, stepIndex) {
     default:
       return state;
   }
+}
+
+// ═══ REDEPLOY ELEVATE ═══
+
+/**
+ * Find the non-constraint, non-deliver station with the lowest utilization.
+ * Returns its index, or -1 if none eligible.
+ * @param {object} state
+ * @returns {number}
+ */
+export function findIdlestDonor(state) {
+  const { stations, constraint } = state;
+  if (constraint < 0) return -1;
+  let idlestIdx = -1;
+  let lowestUtil = Infinity;
+  for (let i = 0; i < stations.length; i++) {
+    if (i === constraint) continue;
+    if (i === stations.length - 1) continue; // skip deliver
+    const st = stations[i];
+    const util = st.totalTime > 0 ? st.busyTime / st.totalTime : 0;
+    if (util < lowestUtil) {
+      lowestUtil = util;
+      idlestIdx = i;
+    }
+  }
+  return idlestIdx;
+}
+
+/**
+ * Move the idlest non-constraint cooker to help the constraint station.
+ * Donor station loses 1 slot (can reach 0 — it stalls); constraint gains 1.
+ * @param {object} state
+ * @returns {object} new SimState
+ */
+export function applyElevateRedeploy(state) {
+  if (state.constraint < 0) return state;
+
+  const stations = state.stations.map(st => ({
+    ...st,
+    occupants: st.occupants.slice(),
+    buffer: st.buffer.slice(),
+  }));
+
+  const donorIdx = findIdlestDonor(state);
+  if (donorIdx < 0) return state;
+
+  stations[donorIdx] = {
+    ...stations[donorIdx],
+    slots: Math.max(0, stations[donorIdx].slots - 1),
+    cap: Math.max(0, stations[donorIdx].cap - 1),
+  };
+
+  const constraint = state.constraint;
+  if (constraint >= 0) {
+    stations[constraint] = {
+      ...stations[constraint],
+      slots: stations[constraint].slots + 1,
+      cap: stations[constraint].cap + 1,
+    };
+  }
+
+  return { ...state, stations, redeployed: true, elevatedFrom: donorIdx };
+}
+
+/**
+ * Undo a redeploy: return the cooker from the constraint back to the donor station.
+ * @param {object} state
+ * @returns {object} new SimState
+ */
+export function revertElevateRedeploy(state) {
+  const stations = state.stations.map(st => ({
+    ...st,
+    occupants: st.occupants.slice(),
+    buffer: st.buffer.slice(),
+  }));
+
+  const { constraint, elevatedFrom } = state;
+
+  if (elevatedFrom >= 0 && elevatedFrom < stations.length) {
+    stations[elevatedFrom] = {
+      ...stations[elevatedFrom],
+      slots: stations[elevatedFrom].slots + 1,
+      cap: stations[elevatedFrom].cap + 1,
+    };
+  }
+
+  if (constraint >= 0 && constraint < stations.length) {
+    stations[constraint] = {
+      ...stations[constraint],
+      slots: Math.max(1, stations[constraint].slots - 1),
+      cap: Math.max(1, stations[constraint].cap - 1),
+    };
+  }
+
+  return { ...state, stations, redeployed: false, elevatedFrom: -1 };
 }

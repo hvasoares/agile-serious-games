@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import GameLayout from '../components/GameLayout.jsx'
 import { PizzaScene } from '../scenes/pizzaScene.js'
 import { usePizzaSim, getCoachingMessage } from '../hooks/usePizzaSim.js'
-import { ROUND_DEFS, TOC_STEPS, STATION_DEFS } from '../sim/pizzaSim.js'
+import { ROUND_DEFS, TOC_STEPS, STATION_DEFS, findIdlestDonor } from '../sim/pizzaSim.js'
 import { getBacklogOrders, getDoingOrders, getDoneOrders } from '../sim/orderSorting.js'
 import CfdChart from '../components/CfdChart.jsx'
 import LineChart from '../components/LineChart.jsx'
@@ -158,6 +158,8 @@ export default function PizzaGame() {
     setShowCfd,
     applyTocStep,
     revertToc,
+    applyRedeploy,
+    revertRedeploy,
   } = usePizzaSim(1)
 
   useEffect(() => {
@@ -435,9 +437,30 @@ export default function PizzaGame() {
                       ? <button onClick={() => revertToc(2)} className="speed-btn active" style={{ fontSize: 10, padding: '2px 8px' }}>✓ Revert</button>
                       : <button onClick={() => applyTocStep(2)} disabled={!constraintKey} style={{ fontSize: 10, padding: '2px 8px' }}>Apply</button>
                   } else if (i === 3) {
-                    actionBtn = toc.elevated
-                      ? <button onClick={() => revertToc(3)} className="speed-btn active" style={{ fontSize: 10, padding: '2px 8px' }}>✓ Revert</button>
-                      : <button onClick={() => applyTocStep(3)} disabled={!constraintKey} style={{ fontSize: 10, padding: '2px 8px' }}>Apply</button>
+                    const donorIdx = constraintKey ? findIdlestDonor(toc) : -1
+                    const donorKey = donorIdx >= 0 ? STATION_DEFS[donorIdx]?.key : null
+                    actionBtn = (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 9, color: '#8a8073' }}>+1 oven slot</span>
+                          {toc.elevated
+                            ? <button onClick={() => revertToc(3)} className="speed-btn active" style={{ fontSize: 10, padding: '2px 8px' }}>✓ Revert</button>
+                            : <button onClick={() => applyTocStep(3)} disabled={!constraintKey} style={{ fontSize: 10, padding: '2px 8px' }}>Apply</button>
+                          }
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 9, color: '#8a8073' }}>
+                            {toc.redeployed
+                              ? `${STATION_DEFS[toc.elevatedFrom]?.key ?? '?'} → ${constraintKey}`
+                              : donorKey ? `move ${donorKey}` : 'move cooker'}
+                          </span>
+                          {toc.redeployed
+                            ? <button onClick={() => revertRedeploy()} className="speed-btn active" style={{ fontSize: 10, padding: '2px 8px' }}>✓ Revert</button>
+                            : <button onClick={() => applyRedeploy()} disabled={!constraintKey} style={{ fontSize: 10, padding: '2px 8px' }}>Apply</button>
+                          }
+                        </div>
+                      </div>
+                    )
                   } else if (i === 4) {
                     actionBtn = (
                       <button onClick={() => applyTocStep(4)} disabled={!constraintKey} style={{ fontSize: 10, padding: '2px 8px' }}>Repeat</button>

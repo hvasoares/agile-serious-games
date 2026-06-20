@@ -7,6 +7,9 @@ import {
   wipCount,
   applyTocAction,
   revertTocAction,
+  findIdlestDonor,
+  applyElevateRedeploy,
+  revertElevateRedeploy,
   STATION_DEFS,
   ROUND_DEFS,
   TOC_STEPS,
@@ -94,9 +97,9 @@ describe('freshSim', () => {
       expect(state.mode).toBe('pull')
     })
 
-    it('sets station caps to [2,2,2,3,2]', () => {
+    it('sets station caps to [2,2,2,3,6]', () => {
       // Arrange
-      const expected = [2, 2, 2, 3, 2]
+      const expected = [2, 2, 2, 3, 6]
       // Act
       const state = freshSim(2)
       // Assert
@@ -106,15 +109,15 @@ describe('freshSim', () => {
     })
   })
 
-  describe('round 3 (pull mode, caps=[2,2,3,3,2])', () => {
+  describe('round 3 (pull mode, caps=[2,2,3,3,6])', () => {
     it('returns mode pull', () => {
       const state = freshSim(3)
       expect(state.mode).toBe('pull')
     })
 
-    it('sets station caps to [2,2,3,3,2]', () => {
+    it('sets station caps to [2,2,3,3,6]', () => {
       // Arrange
-      const expected = [2, 2, 3, 3, 2]
+      const expected = [2, 2, 3, 3, 6]
       // Act
       const state = freshSim(3)
       // Assert
@@ -684,5 +687,137 @@ describe('step — station utilization (busyTime / totalTime)', () => {
     state.stations.forEach(st => {
       expect(st.busyTime ?? 0).toBeLessThanOrEqual(st.totalTime ?? 0)
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// findIdlestDonor
+// ---------------------------------------------------------------------------
+describe('findIdlestDonor', () => {
+  it('returns -1 when no constraint is identified', () => {
+    const state = freshSim(3)
+    expect(findIdlestDonor(state)).toBe(-1)
+  })
+
+  it('skips the constraint station itself', () => {
+    const state = { ...freshSim(3), constraint: 3 }
+    const donor = findIdlestDonor(state)
+    expect(donor).not.toBe(3)
+  })
+
+  it('skips the deliver station (last)', () => {
+    const state = { ...freshSim(3), constraint: 3 }
+    const donor = findIdlestDonor(state)
+    expect(donor).not.toBe(4)
+  })
+
+  it('returns a valid station index when constraint is set', () => {
+    const state = { ...freshSim(3), constraint: 3 }
+    const donor = findIdlestDonor(state)
+    expect(donor).toBeGreaterThanOrEqual(0)
+    expect(donor).toBeLessThan(5)
+  })
+
+  it('prefers the station with lower utilization', () => {
+    // Arrange — give station 0 high busyTime, station 1 zero busyTime
+    const state = freshSim(3)
+    const stations = state.stations.map((st, i) => ({
+      ...st,
+      busyTime: i === 0 ? 10 : 0,
+      totalTime: 10,
+    }))
+    const s = { ...state, stations, constraint: 3 }
+    // Act
+    const donor = findIdlestDonor(s)
+    // Assert — station 1 (or 2) is idler; station 0 is busiest
+    expect(donor).not.toBe(0)
+    expect(donor).not.toBe(3) // not constraint
+  })
+})
+
+// ---------------------------------------------------------------------------
+// applyElevateRedeploy
+// ---------------------------------------------------------------------------
+describe('applyElevateRedeploy', () => {
+  it('returns the same state when no constraint is set', () => {
+    const state = freshSim(3) // constraint: -1
+    expect(applyElevateRedeploy(state)).toEqual(state)
+  })
+
+  it('decreases donor station slots by 1', () => {
+    const state = { ...freshSim(3), constraint: 3 }
+    const next = applyElevateRedeploy(state)
+    const donorIdx = findIdlestDonor(state)
+    expect(next.stations[donorIdx].slots).toBe(state.stations[donorIdx].slots - 1)
+  })
+
+  it('increases constraint station slots by 1', () => {
+    const state = { ...freshSim(3), constraint: 3 }
+    const next = applyElevateRedeploy(state)
+    expect(next.stations[3].slots).toBe(state.stations[3].slots + 1)
+  })
+
+  it('sets redeployed to true and records elevatedFrom', () => {
+    const state = { ...freshSim(3), constraint: 3 }
+    const next = applyElevateRedeploy(state)
+    const donorIdx = findIdlestDonor(state)
+    expect(next.redeployed).toBe(true)
+    expect(next.elevatedFrom).toBe(donorIdx)
+  })
+
+  it('donor cap also decreases by 1', () => {
+    const state = { ...freshSim(3), constraint: 3 }
+    const donorIdx = findIdlestDonor(state)
+    const next = applyElevateRedeploy(state)
+    expect(next.stations[donorIdx].cap).toBe(
+      Math.max(0, state.stations[donorIdx].cap - 1)
+    )
+  })
+
+  it('donor slots do not go below 0', () => {
+    const state = freshSim(3)
+    const stations = state.stations.map((st, i) => ({
+      ...st, slots: i === 0 ? 0 : st.slots,
+    }))
+    // force donor to be station 0 (slots already 0)
+    const s = { ...state, stations, constraint: 3 }
+    const next = applyElevateRedeploy(s)
+    expect(next.stations[findIdlestDonor(s)].slots).toBeGreaterThanOrEqual(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// revertElevateRedeploy
+// ---------------------------------------------------------------------------
+describe('revertElevateRedeploy', () => {
+  it('restores donor station slots', () => {
+    const state = { ...freshSim(3), constraint: 3 }
+    const applied = applyElevateRedeploy(state)
+    const reverted = revertElevateRedeploy(applied)
+    expect(reverted.stations[applied.elevatedFrom].slots).toBe(
+      state.stations[applied.elevatedFrom].slots
+    )
+  })
+
+  it('decrements constraint station slots back down', () => {
+    const state = { ...freshSim(3), constraint: 3 }
+    const applied = applyElevateRedeploy(state)
+    const reverted = revertElevateRedeploy(applied)
+    expect(reverted.stations[3].slots).toBe(state.stations[3].slots)
+  })
+
+  it('sets redeployed to false and elevatedFrom to -1', () => {
+    const state = { ...freshSim(3), constraint: 3 }
+    const reverted = revertElevateRedeploy(applyElevateRedeploy(state))
+    expect(reverted.redeployed).toBe(false)
+    expect(reverted.elevatedFrom).toBe(-1)
+  })
+
+  it('constraint station slots never go below 1 on revert', () => {
+    // Artificially force constraint slots to 1 before revert
+    const state = { ...freshSim(3), constraint: 3, redeployed: true, elevatedFrom: 0 }
+    const low = { ...state, stations: state.stations.map((st, i) => i === 3 ? { ...st, slots: 1 } : st) }
+    const reverted = revertElevateRedeploy(low)
+    expect(reverted.stations[3].slots).toBeGreaterThanOrEqual(1)
   })
 })
