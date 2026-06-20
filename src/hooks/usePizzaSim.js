@@ -2,7 +2,7 @@
 // Owns the RAF loop, exposes actions, and manages scene lifecycle handoff.
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { freshSim, resetSimData, step, applyTocAction, revertTocAction, applyElevateRedeploy, revertElevateRedeploy } from '../sim/pizzaSim.js'
+import { freshSim, resetSimData, step, applyTocAction, revertTocAction } from '../sim/pizzaSim.js'
 
 export function usePizzaSim(initialRound = 1) {
   // ── React state (triggers re-renders) ──────────────────────────────────────
@@ -170,24 +170,6 @@ export function usePizzaSim(initialRound = 1) {
     setSimState(next)
   }, [])
 
-  // Move idlest cooker to constraint (Elevate variant B)
-  const applyRedeploy = useCallback(() => {
-    const current = simStateRef.current
-    if (!current.toc) return
-    const next = applyElevateRedeploy(current)
-    simStateRef.current = next
-    setSimState(next)
-  }, [])
-
-  // Undo redeploy
-  const revertRedeploy = useCallback(() => {
-    const current = simStateRef.current
-    if (!current.toc) return
-    const next = revertElevateRedeploy(current)
-    simStateRef.current = next
-    setSimState(next)
-  }, [])
-
   const tocPrev = useCallback(() => {
     const current = simStateRef.current
     if (!current.toc) return
@@ -234,8 +216,6 @@ export function usePizzaSim(initialRound = 1) {
     setShowCfd,
     applyTocStep,
     revertToc,
-    applyRedeploy,
-    revertRedeploy,
   }
 }
 

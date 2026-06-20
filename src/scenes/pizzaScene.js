@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { getBacklogOrders } from '../sim/orderSorting.js'
+import { computeScore } from '../sim/metrics.js'
 
 // ═══ STATION LAYOUT (matches reference: SPAN=22, 5 stations) ═══
 
@@ -102,6 +103,7 @@ export class PizzaScene {
     this._orderPileCards = []       // pre-pooled flat card meshes
     this._orderPileCount = 0        // last known pile size (for delta detection)
     this._orderTakerArm = null      // ref for arm animation
+    this._lastStationSlots = []     // track slot counts for cap label refresh
 
     // Shared slice geometry (all slices reuse this)
     this._sliceGeo = makeSliceGeo()
@@ -583,6 +585,14 @@ export class PizzaScene {
       }
     })
 
+    // Refresh cap labels when any station's slot count changes (e.g. after Elevate)
+    const slotsNow = simState.stations.map(s => s.slots)
+    const slotsChanged = slotsNow.some((s, i) => s !== this._lastStationSlots[i])
+    if (slotsChanged) {
+      this._lastStationSlots = slotsNow
+      this._buildCapLabels(simState)
+    }
+
     // Order pile + order taker animation
     const t = simState.t
     this._syncOrderPile(simState, t)
@@ -591,10 +601,9 @@ export class PizzaScene {
     this._workers.forEach((w, i) => {
       const st = simState.stations[i]
       const busy = st.occupants.some(p => p.state === 'working')
-      // Cut worker (i=0) tilts arm leftward toward the pile while cutting
       if (i === 0 && busy) {
         w.arm.rotation.x = Math.sin(t * 7) * 0.5
-        w.arm.rotation.z = -0.4 + Math.sin(t * 3.5) * 0.25  // reach toward pile
+        w.arm.rotation.z = -0.4 + Math.sin(t * 3.5) * 0.25
       } else if (busy) {
         w.arm.rotation.x = Math.sin(t * 8 + i) * 0.7
         w.arm.rotation.z += (0.5 - w.arm.rotation.z) * 0.1
@@ -616,12 +625,14 @@ export class PizzaScene {
 
     // Metrics callback
     if (this._onUpdate) {
-      const waste = simState.stations.reduce((a, st) => a + st.buffer.length, 0)
       const wip = simState.stations.reduce((a, st) => a + st.occupants.length, 0)
+      const { profit, wipCost, net } = computeScore(simState.pizzas ?? [], simState.delivered ?? 0)
       this._onUpdate({
         delivered: simState.delivered,
-        waste,
         wip,
+        profit,
+        wipCost,
+        net,
         avgLeadTime: simState.delivered > 0 ? simState.leadSum / simState.delivered : null,
         elapsed: simState.t,
         stationStats: simState.stations.map(s => ({
