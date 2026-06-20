@@ -156,6 +156,8 @@ export default function PizzaGame() {
     tocPrev,
     setToc,
     setShowCfd,
+    applyTocStep,
+    revertToc,
   } = usePizzaSim(1)
 
   useEffect(() => {
@@ -314,9 +316,18 @@ export default function PizzaGame() {
             const occupantCount = station.occupantLen ?? (Array.isArray(station.occupants) ? station.occupants.length : 0)
             const slots = station.slots ?? 1
             const atCap = bufferCap < 99 && bufferCount >= bufferCap
+            const isConstraint = round === 3 && simState?.constraint === i
+            const utilPct = round === 3 && simState?.tocStep >= 1 && station.totalTime > 0
+              ? Math.round((station.busyTime ?? 0) / station.totalTime * 100)
+              : null
             return (
               <div key={name} className="col-stat-row" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 2, marginBottom: 6 }}>
-                <span style={{ fontWeight: 600, fontSize: 12 }}>{name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ fontWeight: 600, fontSize: 12 }}>{name}</span>
+                  {isConstraint && (
+                    <span style={{ fontSize: 9, color: '#e0a24b', fontWeight: 700 }}>◆ CONSTRAINT</span>
+                  )}
+                </div>
                 <div style={{ display: 'flex', gap: 8, fontSize: 11, color: 'var(--text-muted)' }}>
                   <span>
                     Buffer:{' '}
@@ -325,9 +336,12 @@ export default function PizzaGame() {
                       <span className="wip-limit-tag"> / {bufferCap}</span>
                     )}
                   </span>
-                  <span>
-                    Working: {occupantCount}/{slots}
-                  </span>
+                  <span>Working: {occupantCount}/{slots}</span>
+                  {utilPct !== null && (
+                    <span style={{ color: utilPct >= 90 ? '#7cb342' : utilPct >= 60 ? '#e0a24b' : '#d8442a' }}>
+                      {utilPct}%
+                    </span>
+                  )}
                 </div>
               </div>
             )
@@ -385,39 +399,80 @@ export default function PizzaGame() {
           >
             {simState?.toc ? 'Guided Mode ON' : 'Guided Mode'}
           </button>
-          {simState?.toc && simState?.tocStep >= 0 && TOC_STEPS?.[simState.tocStep] && (
-            <div>
-              <div style={{ marginBottom: 8 }}>
-                <span
-                  className="game-tag"
-                  style={{ fontSize: 10, display: 'inline-block', marginBottom: 4 }}
-                >
-                  {TOC_STEPS[simState.tocStep].tag}
-                </span>
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
-                  {TOC_STEPS[simState.tocStep].title}
+
+          {simState?.toc && (() => {
+            const toc = simState
+            const constraintKey = toc.constraint >= 0 ? STATION_DEFS[toc.constraint]?.key : null
+            const spawnSec = (toc.spawnInterval ?? 0.4).toFixed(1)
+
+            return (
+              <div>
+                {/* Demand + constraint summary */}
+                <div style={{ fontSize: 10, color: '#8a8073', marginBottom: 10, lineHeight: 1.7 }}>
+                  {constraintKey
+                    ? <>Constraint: <strong style={{ color: '#e0a24b' }}>{constraintKey}</strong> · demand every {spawnSec}s</>
+                    : 'Start sim and identify the constraint.'}
                 </div>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                  {TOC_STEPS[simState.tocStep].body}
-                </p>
+
+                {/* Per-step rows */}
+                {TOC_STEPS.map((s, i) => {
+                  const reached = toc.tocStep >= i
+                  let actionBtn = null
+
+                  if (i === 0) {
+                    actionBtn = (
+                      <button onClick={() => applyTocStep(0)} style={{ fontSize: 10, padding: '2px 8px' }}>
+                        {constraintKey ? '↺ Re-identify' : 'Find'}
+                      </button>
+                    )
+                  } else if (i === 1) {
+                    // Exploit: purely metric visibility, active once Identify done
+                    actionBtn = reached
+                      ? <span style={{ fontSize: 9, color: '#2f8fd6' }}>Monitoring</span>
+                      : null
+                  } else if (i === 2) {
+                    actionBtn = toc.subordinate
+                      ? <button onClick={() => revertToc(2)} className="speed-btn active" style={{ fontSize: 10, padding: '2px 8px' }}>✓ Revert</button>
+                      : <button onClick={() => applyTocStep(2)} disabled={!constraintKey} style={{ fontSize: 10, padding: '2px 8px' }}>Apply</button>
+                  } else if (i === 3) {
+                    actionBtn = toc.elevated
+                      ? <button onClick={() => revertToc(3)} className="speed-btn active" style={{ fontSize: 10, padding: '2px 8px' }}>✓ Revert</button>
+                      : <button onClick={() => applyTocStep(3)} disabled={!constraintKey} style={{ fontSize: 10, padding: '2px 8px' }}>Apply</button>
+                  } else if (i === 4) {
+                    actionBtn = (
+                      <button onClick={() => applyTocStep(4)} disabled={!constraintKey} style={{ fontSize: 10, padding: '2px 8px' }}>Repeat</button>
+                    )
+                  }
+
+                  return (
+                    <div key={i} style={{
+                      marginBottom: 8,
+                      opacity: reached || i === 0 ? 1 : 0.45,
+                      borderLeft: `2px solid ${reached ? '#e0a24b' : '#2a201a'}`,
+                      paddingLeft: 8,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4 }}>
+                        <div style={{ flex: 1 }}>
+                          <span className="game-tag" style={{ fontSize: 9 }}>{s.tag}</span>
+                          <div style={{ fontSize: 11, fontWeight: 600, marginTop: 2 }}>{s.title}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, lineHeight: 1.4 }}>{s.body}</div>
+                        </div>
+                        {actionBtn && <div style={{ flexShrink: 0, marginTop: 2 }}>{actionBtn}</div>}
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Constraint history trail */}
+                {(toc.constraintHistory ?? []).length > 0 && (
+                  <div style={{ fontSize: 9, color: '#5a4a3a', marginTop: 6, lineHeight: 1.6 }}>
+                    History: {toc.constraintHistory.map(h => h.stationKey).join(' → ')}
+                    {constraintKey ? ` → ${constraintKey}` : ''}
+                  </div>
+                )}
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button
-                  onClick={tocPrev}
-                  disabled={simState.tocStep === 0}
-                  style={{ flex: 1, fontSize: 12 }}
-                >
-                  ← Back
-                </button>
-                <button
-                  onClick={tocNext}
-                  style={{ flex: 2, fontSize: 12 }}
-                >
-                  Apply Next
-                </button>
-              </div>
-            </div>
-          )}
+            )
+          })()}
         </div>
       )}
 

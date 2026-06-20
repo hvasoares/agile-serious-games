@@ -6,10 +6,12 @@ import {
   wasteCount,
   wipCount,
   applyTocAction,
+  revertTocAction,
   STATION_DEFS,
   ROUND_DEFS,
   TOC_STEPS,
 } from '../pizzaSim.js'
+import { SPAWN_INTERVAL } from '../simConfig.js'
 
 // ---------------------------------------------------------------------------
 // Helper — build minimal station arrays for unit testing detectConstraint,
@@ -161,10 +163,11 @@ describe('step', () => {
   it('creates at least one pizza in buffer or occupants of station[0] after enough spawn ticks', () => {
     // Arrange
     let state = freshSim(1)
-    // Act — three steps of dt=0.7 should accumulate enough spawn timer to trigger a spawn
-    state = step(state, 0.7)
-    state = step(state, 0.7)
-    state = step(state, 0.7)
+    // Act — two steps of dt=0.22: first step no spawn (0.22 < 0.4),
+    // second step fires a spawn (0.44 >= 0.4) and the slice stays in station[0]
+    // because prog (0.22) < Cut duration (0.3).
+    state = step(state, 0.22)
+    state = step(state, 0.22)
     // Assert
     const station0 = state.stations[0]
     const total = station0.buffer.length + station0.occupants.length
@@ -394,6 +397,24 @@ describe('applyTocAction', () => {
       expect(result.stations[0].cap).toBe(1)
     })
 
+    it('sets spawnInterval to match constraint throughput when constraint is known', () => {
+      // Arrange — constraint = bake (index 3): dur=6, slots=3 → spawnInterval = 6/3 = 2.0s
+      const state = { ...freshSim(3), constraint: 3 }
+      // Act
+      const result = applyTocAction(state, 2)
+      // Assert
+      expect(result.spawnInterval).toBeCloseTo(2.0)
+    })
+
+    it('leaves spawnInterval unchanged when no constraint is identified', () => {
+      // Arrange
+      const state = { ...freshSim(1), constraint: -1 }
+      // Act
+      const result = applyTocAction(state, 2)
+      // Assert
+      expect(result.spawnInterval).toBe(state.spawnInterval ?? SPAWN_INTERVAL)
+    })
+
     it('sets result.tocStep to 2', () => {
       // Arrange
       const state = freshSim(1)
@@ -405,34 +426,41 @@ describe('applyTocAction', () => {
   })
 
   describe('step 3 — Elevate the constraint', () => {
-    it('increases the constraint station slots by 1 for a non-fixedCap station', () => {
-      // Arrange — build a state where the constraint is NOT station 3 (fixed)
-      // Force constraint to station 1 by giving it a deep buffer
-      const base = freshSim(1)
-      // We'll test by placing state with a known constraint (non-fixed)
-      // Use applyTocAction step 0 to identify it first, then check elevate
+    it('increases the constraint station slots by 1', () => {
+      // Arrange
+      const base = freshSim(3)
       const afterIdentify = applyTocAction(base, 0)
       const constraint = afterIdentify.constraint
-      const originalSlots = base.stations[constraint].slots
+      const originalSlots = afterIdentify.stations[constraint].slots
 
       // Act
       const result = applyTocAction(afterIdentify, 3)
 
-      // Assert — if the constraint is not fixedCap, slots should increase
-      if (!base.stations[constraint].fixedCap) {
-        expect(result.stations[constraint].slots).toBe(originalSlots + 1)
-      }
+      // Assert — elevation always applies, including fixedCap stations (ToC overrides the slider guard)
+      expect(result.stations[constraint].slots).toBe(originalSlots + 1)
     })
 
-    it('does NOT elevate a fixedCap station (oven stays at original slots)', () => {
-      // Arrange — manufacture a state where constraint === 3 (fixedCap station)
-      const base = freshSim(1)
-      const stateWithFixedConstraint = { ...base, constraint: 3 }
+    it('elevates bake (fixedCap station) when it is the identified constraint', () => {
+      // Arrange — force constraint to bake (index 3, fixedCap: true)
+      const base = freshSim(3)
+      const stateWithBakeConstraint = { ...base, constraint: 3 }
       const originalSlots = base.stations[3].slots
+
       // Act
-      const result = applyTocAction(stateWithFixedConstraint, 3)
+      const result = applyTocAction(stateWithBakeConstraint, 3)
+
+      // Assert — fixedCap no longer blocks ToC Elevate
+      expect(result.stations[3].slots).toBe(originalSlots + 1)
+      expect(result.stations[3].cap).toBe(base.stations[3].cap + 1)
+    })
+
+    it('sets result.elevated to true', () => {
+      // Arrange
+      const state = { ...freshSim(3), constraint: 3 }
+      // Act
+      const result = applyTocAction(state, 3)
       // Assert
-      expect(result.stations[3].slots).toBe(originalSlots)
+      expect(result.elevated).toBe(true)
     })
 
     it('sets result.tocStep to 3', () => {
@@ -492,5 +520,169 @@ describe('ROUND_DEFS', () => {
 describe('TOC_STEPS', () => {
   it('has at least 5 entries (Identify, Exploit, Subordinate, Elevate, Repeat)', () => {
     expect(TOC_STEPS.length).toBeGreaterThanOrEqual(5)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// revertTocAction
+// ---------------------------------------------------------------------------
+describe('revertTocAction', () => {
+  it('does NOT mutate the input state', () => {
+    // Arrange
+    const state = applyTocAction({ ...freshSim(3), constraint: 3 }, 2)
+    const frozen = JSON.stringify(state)
+    // Act
+    revertTocAction(state, 2)
+    // Assert
+    expect(JSON.stringify(state)).toBe(frozen)
+  })
+
+  describe('step 2 — undo Subordinate', () => {
+    it('restores spawnInterval to SPAWN_INTERVAL', () => {
+      // Arrange — apply Subordinate so spawnInterval changes
+      const afterSub = applyTocAction({ ...freshSim(3), constraint: 3 }, 2)
+      expect(afterSub.spawnInterval).not.toBe(SPAWN_INTERVAL) // ensure it was changed
+
+      // Act
+      const reverted = revertTocAction(afterSub, 2)
+
+      // Assert
+      expect(reverted.spawnInterval).toBe(SPAWN_INTERVAL)
+    })
+
+    it('restores station[0].cap to the round default', () => {
+      // Arrange — Round 3 default cap[0] = 2
+      const afterSub = applyTocAction({ ...freshSim(3), constraint: 3 }, 2)
+      expect(afterSub.stations[0].cap).toBe(1) // was reduced to 1
+
+      // Act
+      const reverted = revertTocAction(afterSub, 2)
+
+      // Assert
+      expect(reverted.stations[0].cap).toBe(ROUND_DEFS[2].caps[0]) // back to 2
+    })
+
+    it('sets subordinate to false', () => {
+      // Arrange
+      const afterSub = applyTocAction({ ...freshSim(3), constraint: 3 }, 2)
+      // Act
+      const reverted = revertTocAction(afterSub, 2)
+      // Assert
+      expect(reverted.subordinate).toBe(false)
+    })
+  })
+
+  describe('step 3 — undo Elevate', () => {
+    it('decrements constraint station slots by 1', () => {
+      // Arrange — elevate bake (index 3)
+      const afterElev = applyTocAction({ ...freshSim(3), constraint: 3 }, 3)
+      const elevatedSlots = afterElev.stations[3].slots
+
+      // Act
+      const reverted = revertTocAction(afterElev, 3)
+
+      // Assert
+      expect(reverted.stations[3].slots).toBe(elevatedSlots - 1)
+    })
+
+    it('decrements constraint station cap by 1', () => {
+      // Arrange
+      const afterElev = applyTocAction({ ...freshSim(3), constraint: 3 }, 3)
+      const elevatedCap = afterElev.stations[3].cap
+
+      // Act
+      const reverted = revertTocAction(afterElev, 3)
+
+      // Assert
+      expect(reverted.stations[3].cap).toBe(elevatedCap - 1)
+    })
+
+    it('sets elevated to false', () => {
+      // Arrange
+      const afterElev = applyTocAction({ ...freshSim(3), constraint: 3 }, 3)
+      // Act
+      const reverted = revertTocAction(afterElev, 3)
+      // Assert
+      expect(reverted.elevated).toBe(false)
+    })
+
+    it('never drops slots below 1', () => {
+      // Arrange — state with constraint station at minimum slots
+      const base = freshSim(1)
+      const stateAtMin = { ...base, constraint: 1, stations: base.stations.map((s, i) => i === 1 ? { ...s, slots: 1 } : s) }
+      // Act
+      const reverted = revertTocAction(stateAtMin, 3)
+      // Assert
+      expect(reverted.stations[1].slots).toBeGreaterThanOrEqual(1)
+    })
+  })
+
+  it('returns state unchanged for an unknown step index', () => {
+    // Arrange
+    const state = freshSim(3)
+    // Act
+    const result = revertTocAction(state, 99)
+    // Assert — same shape (no mutation)
+    expect(result.spawnInterval).toBe(state.spawnInterval)
+    expect(result.subordinate).toBe(state.subordinate)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// step — dynamic spawnInterval
+// ---------------------------------------------------------------------------
+describe('step — dynamic spawnInterval', () => {
+  it('respects a custom spawnInterval faster than the default', () => {
+    // Arrange — very fast spawn (0.01s) should fire immediately
+    let state = { ...freshSim(1), spawnInterval: 0.01 }
+    // Act
+    state = step(state, 0.05)
+    // Assert — station[0] should have at least 1 pizza after a single step
+    const st0 = state.stations[0]
+    expect(st0.buffer.length + st0.occupants.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('respects a custom spawnInterval much slower than the default (no spawn in short time)', () => {
+    // Arrange — very slow spawn (60s), run for 1s — nothing should spawn
+    let state = { ...freshSim(1), spawnInterval: 60 }
+    for (let i = 0; i < 10; i++) state = step(state, 0.1)
+    // Assert — no pizzas in the system
+    const total = state.stations.reduce((s, st) => s + st.buffer.length + st.occupants.length, 0)
+    expect(total).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// step — station utilization tracking
+// ---------------------------------------------------------------------------
+describe('step — station utilization (busyTime / totalTime)', () => {
+  it('accumulates totalTime on every station each tick', () => {
+    // Arrange
+    let state = freshSim(1)
+    // Act — run 5 steps of dt=0.1
+    for (let i = 0; i < 5; i++) state = step(state, 0.1)
+    // Assert — every station has totalTime ≈ 0.5
+    state.stations.forEach(st => {
+      expect(st.totalTime).toBeCloseTo(0.5, 1)
+    })
+  })
+
+  it('accumulates busyTime only for stations with active occupants', () => {
+    // Arrange — fast spawn so a pizza gets picked up quickly
+    let state = { ...freshSim(1), spawnInterval: 0.01 }
+    // Run enough steps for at least one pizza to enter a station occupant slot
+    for (let i = 0; i < 20; i++) state = step(state, 0.05)
+    // Assert — station[0] (Cut) should have busyTime > 0
+    expect(state.stations[0].busyTime).toBeGreaterThan(0)
+  })
+
+  it('busyTime never exceeds totalTime for any station', () => {
+    // Arrange
+    let state = freshSim(1)
+    for (let i = 0; i < 100; i++) state = step(state, 0.05)
+    // Assert
+    state.stations.forEach(st => {
+      expect(st.busyTime ?? 0).toBeLessThanOrEqual(st.totalTime ?? 0)
+    })
   })
 })

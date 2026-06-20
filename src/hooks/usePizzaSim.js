@@ -2,7 +2,7 @@
 // Owns the RAF loop, exposes actions, and manages scene lifecycle handoff.
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { freshSim, step, applyTocAction } from '../sim/pizzaSim.js'
+import { freshSim, step, applyTocAction, revertTocAction } from '../sim/pizzaSim.js'
 
 export function usePizzaSim(initialRound = 1) {
   // ── React state (triggers re-renders) ──────────────────────────────────────
@@ -132,6 +132,31 @@ export function usePizzaSim(initialRound = 1) {
     }
   }, [loop])
 
+  // Apply any specific ToC step directly (allows per-step toggles in the UI)
+  const applyTocStep = useCallback((stepIndex) => {
+    const current = simStateRef.current
+    if (!current.toc) return
+    const next = applyTocAction(current, stepIndex)
+    simStateRef.current = next
+    setSimState(next)
+    if (stepIndex === 0 && !runningRef.current) {
+      runningRef.current = true
+      setRunning(true)
+      if (!animIdRef.current) {
+        animIdRef.current = requestAnimationFrame(loop)
+      }
+    }
+  }, [loop])
+
+  // Revert a structural ToC action (Subordinate or Elevate)
+  const revertToc = useCallback((stepIndex) => {
+    const current = simStateRef.current
+    if (!current.toc) return
+    const next = revertTocAction(current, stepIndex)
+    simStateRef.current = next
+    setSimState(next)
+  }, [])
+
   const tocPrev = useCallback(() => {
     const current = simStateRef.current
     if (!current.toc) return
@@ -176,6 +201,8 @@ export function usePizzaSim(initialRound = 1) {
     tocPrev,
     setToc,
     setShowCfd,
+    applyTocStep,
+    revertToc,
   }
 }
 

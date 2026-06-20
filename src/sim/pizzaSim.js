@@ -82,6 +82,8 @@ export function freshSim(roundNum) {
     fixedCap: def.fixedCap,
     occupants: [],
     buffer: [],
+    busyTime: 0,
+    totalTime: 0,
   }));
 
   return {
@@ -102,6 +104,9 @@ export function freshSim(roundNum) {
     constraint: -1,
     exploit: false,
     subordinate: false,
+    elevated: false,
+    spawnInterval: SPAWN_INTERVAL,
+    constraintHistory: [],
     _nextId: 0,
     orders: [],
     orderCounter: 0,
@@ -169,9 +174,18 @@ export function step(state, dt) {
     for (const p of st.occupants) pizzaMap.set(p.i, p);
   }
 
-  // 2. Spawn timer
-  if (spawnTimer >= SPAWN_INTERVAL) {
-    spawnTimer -= SPAWN_INTERVAL;
+  // 2a. Track station utilization (capture busy/total time before processing)
+  const spawnInt = state.spawnInterval ?? SPAWN_INTERVAL;
+  for (let si = 0; si < stations.length; si++) {
+    stations[si].totalTime = (stations[si].totalTime ?? 0) + dt;
+    if (stations[si].occupants.length > 0) {
+      stations[si].busyTime = (stations[si].busyTime ?? 0) + dt;
+    }
+  }
+
+  // 2b. Spawn timer
+  if (spawnTimer >= spawnInt) {
+    spawnTimer -= spawnInt;
     const station0 = stations[0];
     if (station0.buffer.length < station0.cap) {
       const newPizza = {
@@ -384,27 +398,43 @@ export function applyTocAction(state, stepIndex) {
   }));
 
   let { constraint, exploit, subordinate, tocStep } = state;
+  let elevated = state.elevated ?? false;
+  let spawnInterval = state.spawnInterval ?? SPAWN_INTERVAL;
+  let constraintHistory = [...(state.constraintHistory ?? [])];
 
   switch (stepIndex) {
-    case 0: // Identify
-      constraint = detectConstraint(stations);
+    case 0: { // Identify
+      const newC = detectConstraint(stations);
+      if (state.constraint >= 0 && state.constraint !== newC) {
+        constraintHistory = [...constraintHistory, {
+          stationKey: state.stations[state.constraint]?.key ?? String(state.constraint),
+          at: Math.round(state.t),
+        }];
+      }
+      constraint = newC;
       tocStep = 0;
       break;
+    }
 
-    case 1: // Exploit
+    case 1: // Exploit — surfaces utilization metrics (no structural change)
       exploit = true;
       tocStep = 1;
       break;
 
-    case 2: // Subordinate
+    case 2: // Subordinate — throttle intake AND slow demand to match constraint throughput
       subordinate = true;
       tocStep = 2;
       stations[0] = { ...stations[0], cap: 1 };
+      if (constraint >= 0) {
+        const cst = stations[constraint];
+        spawnInterval = cst.dur / cst.slots;  // seconds per pizza the constraint can handle
+      }
       break;
 
-    case 3: // Elevate
+    case 3: // Elevate — add capacity to the constraint (fixedCap only blocks the slider, not ToC)
+      elevated = true;
       tocStep = 3;
-      if (constraint >= 0 && !stations[constraint].fixedCap) {
+      if (constraint >= 0) {
         stations[constraint] = {
           ...stations[constraint],
           slots: stations[constraint].slots + 1,
@@ -413,12 +443,22 @@ export function applyTocAction(state, stepIndex) {
       }
       break;
 
-    case 4: // Repeat
-      constraint = detectConstraint(stations);
+    case 4: { // Repeat — re-detect shifted constraint, reset demand for new cycle
+      const newC4 = detectConstraint(stations);
+      if (constraint >= 0 && constraint !== newC4) {
+        constraintHistory = [...constraintHistory, {
+          stationKey: state.stations[constraint]?.key ?? String(constraint),
+          at: Math.round(state.t),
+        }];
+      }
+      constraint = newC4;
       tocStep = 4;
       exploit = false;
       subordinate = false;
+      elevated = false;
+      spawnInterval = SPAWN_INTERVAL;  // reset demand for next cycle
       break;
+    }
 
     default:
       break;
@@ -430,6 +470,47 @@ export function applyTocAction(state, stepIndex) {
     constraint,
     exploit,
     subordinate,
+    elevated,
     tocStep,
+    spawnInterval,
+    constraintHistory,
   };
+}
+
+/**
+ * Revert a structural ToC action. Pure — returns new state.
+ * Only steps 2 (Subordinate) and 3 (Elevate) have reversible effects.
+ * @param {object} state
+ * @param {2|3} stepIndex
+ * @returns {object} new SimState
+ */
+export function revertTocAction(state, stepIndex) {
+  const stations = state.stations.map(st => ({
+    ...st,
+    occupants: st.occupants.slice(),
+    buffer: st.buffer.slice(),
+  }));
+
+  const roundDef = ROUND_DEFS[(state.round ?? 1) - 1];
+
+  switch (stepIndex) {
+    case 2: // Undo Subordinate — restore intake cap and demand rate
+      stations[0] = { ...stations[0], cap: roundDef.caps[0] };
+      return { ...state, stations, subordinate: false, spawnInterval: SPAWN_INTERVAL };
+
+    case 3: { // Undo Elevate — remove the added slot/cap from constraint station
+      const ci = state.constraint;
+      if (ci >= 0 && ci < stations.length) {
+        stations[ci] = {
+          ...stations[ci],
+          slots: Math.max(1, stations[ci].slots - 1),
+          cap: Math.max(1, stations[ci].cap - 1),
+        };
+      }
+      return { ...state, stations, elevated: false };
+    }
+
+    default:
+      return state;
+  }
 }
