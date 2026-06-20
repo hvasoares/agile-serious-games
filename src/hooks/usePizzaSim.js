@@ -77,9 +77,8 @@ export function usePizzaSim(initialRound = 1) {
     cancelAnimationFrame(animIdRef.current)
     animIdRef.current = null
     lastTRef.current = null
-    // Clear all rounds so switching back to any round starts fresh
-    savedRoundStatesRef.current = {}
     const fresh = freshSim(roundRef.current)
+    savedRoundStatesRef.current[roundRef.current] = fresh
     simStateRef.current = fresh
     setSimState(fresh)
     if (sceneRef.current) sceneRef.current.loadRound(roundRef.current, fresh)
