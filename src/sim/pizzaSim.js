@@ -13,7 +13,7 @@ export const STATION_DEFS = [
   { key: 'cut',     dur: STATION_DURATIONS.cut,     slots: 1, fixedCap: false },
   { key: 'sauce',   dur: STATION_DURATIONS.sauce,   slots: 1, fixedCap: false },
   { key: 'top',     dur: STATION_DURATIONS.top,     slots: 1, fixedCap: false },
-  { key: 'bake',    dur: STATION_DURATIONS.bake,    slots: 1, fixedCap: true  },
+  { key: 'bake',    dur: STATION_DURATIONS.bake,    slots: 3, fixedCap: true  },
   { key: 'deliver', dur: STATION_DURATIONS.deliver, slots: 1, fixedCap: false },
 ];
 
