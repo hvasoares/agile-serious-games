@@ -2,7 +2,7 @@
 // Owns the RAF loop, exposes actions, and manages scene lifecycle handoff.
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { freshSim, step, applyTocAction, revertTocAction, applyElevateRedeploy, revertElevateRedeploy } from '../sim/pizzaSim.js'
+import { freshSim, resetSimData, step, applyTocAction, revertTocAction, applyElevateRedeploy, revertElevateRedeploy } from '../sim/pizzaSim.js'
 
 export function usePizzaSim(initialRound = 1) {
   // ── React state (triggers re-renders) ──────────────────────────────────────
@@ -77,7 +77,8 @@ export function usePizzaSim(initialRound = 1) {
     cancelAnimationFrame(animIdRef.current)
     animIdRef.current = null
     lastTRef.current = null
-    const fresh = freshSim(roundRef.current)
+    const current = simStateRef.current
+    const fresh = current.toc ? resetSimData(current) : freshSim(roundRef.current)
     savedRoundStatesRef.current[roundRef.current] = fresh
     simStateRef.current = fresh
     setSimState(fresh)

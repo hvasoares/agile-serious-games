@@ -118,6 +118,68 @@ export function freshSim(roundNum) {
   };
 }
 
+/**
+ * Reset only the run data (time, pizzas, history) while preserving all ToC
+ * configuration and re-applying any active structural changes to fresh stations.
+ * Used for round 3 reset so the player keeps their guided mode progress.
+ * @param {object} state - current SimState
+ * @returns {object} new SimState
+ */
+export function resetSimData(state) {
+  const roundDef = ROUND_DEFS[(state.round ?? 1) - 1];
+
+  // Build fresh stations from defaults
+  let stations = STATION_DEFS.map((def, i) => ({
+    key: def.key,
+    dur: def.dur,
+    slots: def.slots,
+    cap: roundDef.caps[i],
+    fixedCap: def.fixedCap,
+    occupants: [],
+    buffer: [],
+    busyTime: 0,
+    totalTime: 0,
+  }));
+
+  // Re-apply active structural ToC changes so the player's toggles stay in effect
+  if (state.subordinate) {
+    stations[0] = { ...stations[0], cap: 1 };
+  }
+  if (state.elevated && state.constraint >= 0) {
+    const ci = state.constraint;
+    stations[ci] = { ...stations[ci], slots: stations[ci].slots + 1, cap: stations[ci].cap + 1 };
+  }
+  if (state.redeployed) {
+    const di = state.elevatedFrom;
+    const ci = state.constraint;
+    if (di >= 0) {
+      stations[di] = { ...stations[di], slots: Math.max(0, stations[di].slots - 1), cap: Math.max(0, stations[di].cap - 1) };
+    }
+    if (ci >= 0) {
+      stations[ci] = { ...stations[ci], slots: stations[ci].slots + 1, cap: stations[ci].cap + 1 };
+    }
+  }
+
+  return {
+    ...state,
+    t: 0,
+    delivered: 0,
+    leadSum: 0,
+    spawnTimer: 0,
+    pizzas: [],
+    stations,
+    cfd: [],
+    cfdTimer: 0,
+    chartHistory: [],
+    chartTimer: 0,
+    finished: false,
+    _nextId: 0,
+    orders: [],
+    orderCounter: 0,
+    currentOrder: null,
+  };
+}
+
 // ═══ CFD HELPERS ═══
 
 /**

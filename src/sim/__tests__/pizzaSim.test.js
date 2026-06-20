@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   freshSim,
+  resetSimData,
   step,
   detectConstraint,
   wasteCount,
@@ -849,5 +850,69 @@ describe('step — time limit', () => {
   it('timeLimit defaults to TIME_LIMIT (60s)', () => {
     const state = freshSim(1)
     expect(state.timeLimit).toBe(60)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// resetSimData
+// ---------------------------------------------------------------------------
+describe('resetSimData', () => {
+  it('resets t, delivered, pizzas, and history to zero/empty', () => {
+    // Arrange — run the sim a bit to get non-zero state
+    let state = freshSim(3)
+    for (let i = 0; i < 50; i++) state = step(state, 0.1)
+    // Act
+    const r = resetSimData(state)
+    // Assert
+    expect(r.t).toBe(0)
+    expect(r.delivered).toBe(0)
+    expect(r.pizzas).toEqual([])
+    expect(r.cfd).toEqual([])
+    expect(r.chartHistory).toEqual([])
+    expect(r.finished).toBe(false)
+  })
+
+  it('preserves toc, tocStep, constraint, and constraintHistory', () => {
+    const state = { ...freshSim(3), tocStep: 2, constraint: 3, constraintHistory: [{ stationKey: 'top', at: 10 }] }
+    const r = resetSimData(state)
+    expect(r.toc).toBe(true)
+    expect(r.tocStep).toBe(2)
+    expect(r.constraint).toBe(3)
+    expect(r.constraintHistory).toHaveLength(1)
+  })
+
+  it('preserves spawnInterval when subordinate is active', () => {
+    const state = { ...freshSim(3), subordinate: true, spawnInterval: 2.0 }
+    const r = resetSimData(state)
+    expect(r.spawnInterval).toBe(2.0)
+  })
+
+  it('re-applies subordinate cap on station[0]', () => {
+    const state = { ...freshSim(3), subordinate: true }
+    const r = resetSimData(state)
+    expect(r.stations[0].cap).toBe(1)
+  })
+
+  it('re-applies elevated slot on constraint station', () => {
+    const state = { ...freshSim(3), elevated: true, constraint: 3 }
+    const r = resetSimData(state)
+    expect(r.stations[3].slots).toBe(STATION_DEFS[3].slots + 1)
+  })
+
+  it('re-applies redeployed slot transfer (donor loses, constraint gains)', () => {
+    const state = { ...freshSim(3), redeployed: true, elevatedFrom: 0, constraint: 3 }
+    const r = resetSimData(state)
+    expect(r.stations[0].slots).toBe(Math.max(0, STATION_DEFS[0].slots - 1))
+    expect(r.stations[3].slots).toBe(STATION_DEFS[3].slots + 1)
+  })
+
+  it('all station occupants and buffers are empty after reset', () => {
+    let state = freshSim(3)
+    for (let i = 0; i < 100; i++) state = step(state, 0.1)
+    const r = resetSimData(state)
+    r.stations.forEach(st => {
+      expect(st.occupants).toHaveLength(0)
+      expect(st.buffer).toHaveLength(0)
+    })
   })
 })
