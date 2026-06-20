@@ -31,7 +31,7 @@ export const ROUND_DEFS = [
   {
     title: 'Theory of Constraints',
     mode: 'pull',
-    caps: [2, 2, 3, 3, 6],
+    caps: [2, 2, 2, 3, 6],
   },
 ];
 

@@ -110,15 +110,15 @@ describe('freshSim', () => {
     })
   })
 
-  describe('round 3 (pull mode, caps=[2,2,3,3,6])', () => {
+  describe('round 3 (pull mode, caps=[2,2,2,3,6])', () => {
     it('returns mode pull', () => {
       const state = freshSim(3)
       expect(state.mode).toBe('pull')
     })
 
-    it('sets station caps to [2,2,3,3,6]', () => {
+    it('sets station caps to [2,2,2,3,6]', () => {
       // Arrange
-      const expected = [2, 2, 3, 3, 6]
+      const expected = [2, 2, 2, 3, 6]
       // Act
       const state = freshSim(3)
       // Assert
