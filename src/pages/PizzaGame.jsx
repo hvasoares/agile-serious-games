@@ -5,6 +5,7 @@ import { usePizzaSim, getCoachingMessage } from '../hooks/usePizzaSim.js'
 import { ROUND_DEFS, TOC_STEPS, STATION_DEFS } from '../sim/pizzaSim.js'
 import { getBacklogOrders, getDoingOrders, getDoneOrders } from '../sim/orderSorting.js'
 import CfdChart from '../components/CfdChart.jsx'
+import LineChart from '../components/LineChart.jsx'
 
 const STATION_COLORS = ['#e0a24b', '#d8442a', '#e58aa6', '#caa05a', '#7cb342']
 
@@ -123,6 +124,7 @@ function OrderCard({ order, pizzas, forming, animatingOut }) {
 
 export default function PizzaGame() {
   const mountRef = useRef(null)
+  const [showCharts, setShowCharts] = useState(false)
 
   // Track orders that are animating out (blink) or fully dismissed
   const [dismissedOrders, setDismissedOrders] = useState(() => new Set())
@@ -131,6 +133,9 @@ export default function PizzaGame() {
   const [metrics, setMetrics] = useState({
     delivered: 0,
     wip: 0,
+    profit: 0,
+    wipCost: 0,
+    net: 0,
     avgLeadTime: '—',
     elapsed: 0,
     stationStats: [],
@@ -210,6 +215,16 @@ export default function PizzaGame() {
     ? metrics.stationStats
     : simState?.stations ?? []
 
+  const chartHistory = simState?.chartHistory ?? []
+  const leadTimeSeries = [{ data: chartHistory.map(p => ({ t: p.t, value: p.avgLeadTime })), color: '#2f8fd6', label: 'Avg Lead Time (s)' }]
+  const wipSeries      = [{ data: chartHistory.map(p => ({ t: p.t, value: p.wip })),         color: '#e0a24b', label: 'WIP' }]
+  const delivSeries    = [{ data: chartHistory.map(p => ({ t: p.t, value: p.delivered })),    color: '#7cb342', label: 'Delivered' }]
+  const scoreSeries    = [
+    { data: chartHistory.map(p => ({ t: p.t, value: p.profit  })), color: '#7cb342', label: 'Profit'   },
+    { data: chartHistory.map(p => ({ t: p.t, value: p.wipCost })), color: '#d8442a', label: 'WIP Cost' },
+    { data: chartHistory.map(p => ({ t: p.t, value: p.score   })), color: '#f4ecdd', label: 'Score'    },
+  ]
+
   const sidebar = (
     <>
       {/* Section 1 – Round Selector */}
@@ -266,6 +281,23 @@ export default function PizzaGame() {
           <div className="metric-box">
             <span className="metric-box-value">{formatElapsed(metrics.elapsed)}</span>
             <span className="metric-box-label">Elapsed</span>
+          </div>
+          <div className="metric-box">
+            <span className="metric-box-value" style={{ color: '#7cb342' }}>+{metrics.profit ?? 0}</span>
+            <span className="metric-box-label">Profit</span>
+          </div>
+          <div className="metric-box">
+            <span className="metric-box-value" style={{ color: '#d8442a' }}>-{metrics.wipCost ?? 0}</span>
+            <span className="metric-box-label">WIP Cost</span>
+          </div>
+          <div className="metric-box">
+            <span
+              className="metric-box-value"
+              style={{ color: (metrics.net ?? 0) >= 0 ? '#7cb342' : '#d8442a' }}
+            >
+              {(metrics.net ?? 0) >= 0 ? '+' : ''}{metrics.net ?? 0}
+            </span>
+            <span className="metric-box-label">Score</span>
           </div>
         </div>
       </div>
@@ -389,14 +421,21 @@ export default function PizzaGame() {
         </div>
       )}
 
-      {/* Section 8 – CFD Toggle */}
+      {/* Section 8 – Chart Toggles */}
       <div className="sidebar-block">
         <button
           className={`speed-btn ${showCfd ? 'active' : ''}`}
-          style={{ width: '100%' }}
+          style={{ width: '100%', marginBottom: 6 }}
           onClick={() => setShowCfd(!showCfd)}
         >
           {showCfd ? 'Hide CFD' : 'Show CFD'}
+        </button>
+        <button
+          className={`speed-btn ${showCharts ? 'active' : ''}`}
+          style={{ width: '100%' }}
+          onClick={() => setShowCharts(v => !v)}
+        >
+          {showCharts ? 'Hide Charts' : 'Show Charts'}
         </button>
       </div>
 
@@ -495,17 +534,33 @@ export default function PizzaGame() {
 
         </div>
 
-        {/* CFD Overlay — bottom of the 3D scene */}
-        {showCfd && (
+        {/* Bottom overlays — CFD and/or line charts, stacked in a flex column */}
+        {(showCfd || showCharts) && (
           <div style={{
             position: 'absolute',
             bottom: 0, left: 0, right: 0,
             pointerEvents: 'none',
             zIndex: 10,
+            display: 'flex',
+            flexDirection: 'column',
             background: 'rgba(20,17,13,0.88)',
             borderTop: '1px solid rgba(255,255,255,0.06)',
           }}>
-            <CfdChart cfd={simState?.cfd ?? []} />
+            {showCharts && (
+              <div style={{ display: 'flex' }}>
+                {[
+                  [leadTimeSeries, 'Avg Lead Time'],
+                  [wipSeries,      'WIP'],
+                  [delivSeries,    'Delivered'],
+                  [scoreSeries,    'Profit / WIP Cost / Score'],
+                ].map(([s, t]) => (
+                  <div key={t} style={{ flex: 1, minWidth: 0, borderRight: '1px solid rgba(255,255,255,0.04)' }}>
+                    <LineChart series={s} title={t} height={160} />
+                  </div>
+                ))}
+              </div>
+            )}
+            {showCfd && <CfdChart cfd={simState?.cfd ?? []} />}
           </div>
         )}
       </div>

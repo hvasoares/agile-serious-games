@@ -1,17 +1,20 @@
 // pizzaSim.js — Pure simulation engine for the Kanban Pizza Game
 // No React, no Three.js. ES module syntax throughout.
 
+import { SPAWN_INTERVAL, STATION_DURATIONS, isOrderReadyToDeliver } from './simConfig.js'
+import { sampleChartPoint } from './chartMetrics.js'
+
 // ═══ CONSTANTS ═══
 
-const SPAWN_INTERVAL = 0.7; // seconds of sim time between pizza spawns
-const CFD_INTERVAL = 0.4;   // seconds between CFD samples
+const CFD_INTERVAL = 0.4;    // seconds between CFD samples
+const CHART_INTERVAL = 1.0;  // seconds between chart history samples
 
 export const STATION_DEFS = [
-  { key: 'cut',     dur: 1.0, slots: 3, fixedCap: false },
-  { key: 'sauce',   dur: 1.6, slots: 2, fixedCap: false },
-  { key: 'top',     dur: 2.2, slots: 2, fixedCap: false },
-  { key: 'bake',    dur: 3.6, slots: 3, fixedCap: true  },
-  { key: 'deliver', dur: 0.8, slots: 2, fixedCap: false },
+  { key: 'cut',     dur: STATION_DURATIONS.cut,     slots: 1, fixedCap: false },
+  { key: 'sauce',   dur: STATION_DURATIONS.sauce,   slots: 1, fixedCap: false },
+  { key: 'top',     dur: STATION_DURATIONS.top,     slots: 1, fixedCap: false },
+  { key: 'bake',    dur: STATION_DURATIONS.bake,    slots: 1, fixedCap: true  },
+  { key: 'deliver', dur: STATION_DURATIONS.deliver, slots: 1, fixedCap: false },
 ];
 
 export const ROUND_DEFS = [
@@ -92,6 +95,8 @@ export function freshSim(roundNum) {
     stations,
     cfd: [],
     cfdTimer: 0,
+    chartHistory: [],
+    chartTimer: 0,
     toc: roundNum === 3,
     tocStep: -1,
     constraint: -1,
@@ -139,6 +144,7 @@ export function step(state, dt) {
   let _nextId = state._nextId;
   let spawnTimer = state.spawnTimer + dt;
   let cfdTimer = state.cfdTimer + dt;
+  let chartTimer = (state.chartTimer ?? 0) + dt;
   const t = state.t + dt;
   const mode = state.mode;
 
@@ -207,11 +213,31 @@ export function step(state, dt) {
     const isLast = si === 4;
 
     // a. Fill occupants from buffer
-    while (st.occupants.length < st.slots && st.buffer.length > 0) {
-      const pizza = st.buffer.shift();
-      pizza.state = 'working';
-      pizza.prog = 0;
-      st.occupants.push(pizza);
+    if (isLast) {
+      // Gate: only pick up a slice when every slice of its order is at stage 4
+      // (deliver buffer or cooker) or has already been delivered (absent from pizzaMap).
+      const pizzaArr = [...pizzaMap.values()]
+      outer: while (st.occupants.length < st.slots) {
+        for (let bi = 0; bi < st.buffer.length; bi++) {
+          if (st.occupants.length >= st.slots) break outer
+          const pizza = st.buffer[bi]
+          if (isOrderReadyToDeliver(pizza.orderId, orders, pizzaArr)) {
+            st.buffer.splice(bi, 1)
+            pizza.state = 'working'
+            pizza.prog = 0
+            st.occupants.push(pizza)
+            break // restart outer loop — buffer indices have shifted
+          }
+        }
+        break // no ready pizza found this pass
+      }
+    } else {
+      while (st.occupants.length < st.slots && st.buffer.length > 0) {
+        const pizza = st.buffer.shift();
+        pizza.state = 'working';
+        pizza.prog = 0;
+        st.occupants.push(pizza);
+      }
     }
 
     // b. Advance working pizzas' progress
@@ -275,6 +301,14 @@ export function step(state, dt) {
     cfd = [...state.cfd, sample];
   }
 
+  // 6. Chart history sample
+  let chartHistory = state.chartHistory ?? [];
+  if (chartTimer >= CHART_INTERVAL) {
+    chartTimer -= CHART_INTERVAL;
+    const point = sampleChartPoint(t, { stations, pizzas, delivered, leadSum });
+    chartHistory = [...chartHistory, point];
+  }
+
   return {
     ...state,
     t,
@@ -282,9 +316,11 @@ export function step(state, dt) {
     leadSum,
     spawnTimer,
     cfdTimer,
+    chartTimer,
     pizzas,
     stations,
     cfd,
+    chartHistory,
     _nextId,
     orders,
     orderCounter,
