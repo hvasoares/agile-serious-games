@@ -34,6 +34,10 @@ export function usePizzaSim(initialRound = 1) {
     simStateRef.current = next
     if (sceneRef.current) sceneRef.current.syncState(next, dt)
     setSimState(next)
+    if (next.finished) {
+      runningRef.current = false
+      setRunning(false)
+    }
   }, [])
 
   // ── Lifecycle: keep loopRef current so the RAF self-reschedule never goes stale ─

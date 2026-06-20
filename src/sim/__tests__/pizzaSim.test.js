@@ -821,3 +821,33 @@ describe('revertElevateRedeploy', () => {
     expect(reverted.stations[3].slots).toBeGreaterThanOrEqual(1)
   })
 })
+
+// ---------------------------------------------------------------------------
+// step — time limit / finished flag
+// ---------------------------------------------------------------------------
+describe('step — time limit', () => {
+  it('finished is false before the time limit', () => {
+    let state = freshSim(1)
+    // Run for 50s (below 60s limit)
+    for (let i = 0; i < 500; i++) state = step(state, 0.1)
+    expect(state.finished).toBe(false)
+  })
+
+  it('finished becomes true once t reaches timeLimit', () => {
+    let state = { ...freshSim(1), timeLimit: 5 }
+    for (let i = 0; i < 60; i++) state = step(state, 0.1)
+    expect(state.t).toBeGreaterThanOrEqual(5)
+    expect(state.finished).toBe(true)
+  })
+
+  it('freshSim initialises finished to false', () => {
+    expect(freshSim(1).finished).toBe(false)
+    expect(freshSim(2).finished).toBe(false)
+    expect(freshSim(3).finished).toBe(false)
+  })
+
+  it('timeLimit defaults to TIME_LIMIT (60s)', () => {
+    const state = freshSim(1)
+    expect(state.timeLimit).toBe(60)
+  })
+})

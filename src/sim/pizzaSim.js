@@ -1,7 +1,7 @@
 // pizzaSim.js — Pure simulation engine for the Kanban Pizza Game
 // No React, no Three.js. ES module syntax throughout.
 
-import { SPAWN_INTERVAL, STATION_DURATIONS, isOrderReadyToDeliver } from './simConfig.js'
+import { SPAWN_INTERVAL, STATION_DURATIONS, TIME_LIMIT, isOrderReadyToDeliver } from './simConfig.js'
 import { sampleChartPoint } from './chartMetrics.js'
 
 // ═══ CONSTANTS ═══
@@ -99,6 +99,8 @@ export function freshSim(roundNum) {
     cfdTimer: 0,
     chartHistory: [],
     chartTimer: 0,
+    timeLimit: TIME_LIMIT,
+    finished: false,
     toc: roundNum === 3,
     tocStep: -1,
     constraint: -1,
@@ -325,6 +327,7 @@ export function step(state, dt) {
     chartHistory = [...chartHistory, point];
   }
 
+  const timeLimit = state.timeLimit ?? TIME_LIMIT;
   return {
     ...state,
     t,
@@ -341,6 +344,7 @@ export function step(state, dt) {
     orders,
     orderCounter,
     currentOrder,
+    finished: t >= timeLimit,
   };
 }
 

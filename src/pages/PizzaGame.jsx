@@ -256,10 +256,36 @@ export default function PizzaGame() {
       <div className="sidebar-block">
         <h3>Controls</h3>
         <div className="control-row">
-          <button onClick={start} disabled={running}>Start</button>
+          <button onClick={start} disabled={running || simState?.finished}>Start</button>
           <button onClick={pause} disabled={!running}>Pause</button>
           <button onClick={reset}>Reset</button>
         </div>
+        {(() => {
+          const tLimit = simState?.timeLimit ?? 60
+          const elapsed = simState?.t ?? 0
+          const timeLeft = Math.max(0, tLimit - elapsed)
+          const pct = Math.min(100, (elapsed / tLimit) * 100)
+          const finished = simState?.finished
+          return (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontSize: 10, color: finished ? '#d8442a' : '#8a8073' }}>
+                  {finished ? 'Time\'s up!' : `${Math.ceil(timeLeft)}s remaining`}
+                </span>
+                <span style={{ fontSize: 10, color: '#5a4a3a' }}>{tLimit}s</span>
+              </div>
+              <div style={{ height: 4, background: '#2a201a', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${pct}%`,
+                  background: finished ? '#d8442a' : timeLeft < 15 ? '#e0a24b' : '#2f8fd6',
+                  borderRadius: 2,
+                  transition: 'width 0.2s linear',
+                }} />
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Section 3 – Live Metrics */}
