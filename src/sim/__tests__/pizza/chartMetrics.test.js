@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sampleChartPoint } from '../chartMetrics.js'
+import { sampleChartPoint } from '../../pizza/chartMetrics.js'
 
 function makeStation({ occupants = 0, buffer = 0 } = {}) {
   return {

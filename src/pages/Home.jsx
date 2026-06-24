@@ -41,7 +41,7 @@ export default function Home() {
             hands-on 3D simulations — no slides, just games.
           </p>
           <div className="hero-btns">
-            <Link to="/wip" className="btn btn-primary">Start Playing →</Link>
+            <Link to="/pizza" className="btn btn-primary">Start Playing →</Link>
             <a href="#concepts" className="btn btn-ghost">Learn Concepts</a>
           </div>
         </div>
@@ -70,113 +70,6 @@ export default function Home() {
         </div>
 
         <div className="games-grid">
-          {/* WIP Limits */}
-          <div className="game-card" onClick={() => {}}>
-            <div className="game-preview">
-              <div className="wip-board-preview">
-                <div className="wip-col-preview col-backlog">
-                  <div className="wip-col-label-preview">Backlog</div>
-                  <div className="mini-card c-purple" />
-                  <div className="mini-card c-cyan" />
-                  <div className="mini-card" />
-                </div>
-                <div className="wip-col-preview col-overload">
-                  <div className="wip-col-label-preview">In Progress</div>
-                  <div className="mini-card c-red" />
-                  <div className="mini-card c-red" />
-                  <div className="mini-card c-red" />
-                  <div className="mini-card c-red" />
-                </div>
-                <div className="wip-col-preview col-review">
-                  <div className="wip-col-label-preview">Review</div>
-                  <div className="mini-card c-amber" />
-                </div>
-                <div className="wip-col-preview col-done">
-                  <div className="wip-col-label-preview">Done</div>
-                  <div className="mini-card c-done" />
-                  <div className="mini-card c-done" />
-                </div>
-              </div>
-            </div>
-            <div className="game-info">
-              <div className="game-tag">Concept: WIP Limits</div>
-              <h3>The Flow Lab</h3>
-              <p>
-                Adjust WIP limits per column and watch how restricting work-in-progress
-                dramatically improves cycle time and throughput — Little's Law in action.
-              </p>
-              <div className="game-meta">
-                <span>🕐 5–10 min</span>
-                <span>⭐ Beginner</span>
-              </div>
-              <Link to="/wip" className="btn-play">Play Now →</Link>
-            </div>
-          </div>
-
-          {/* Bottleneck */}
-          <div className="game-card">
-            <div className="game-preview">
-              <div className="pipeline-preview">
-                {['Design', 'Dev', 'QA', 'Review', 'Deploy'].map((name, i) => (
-                  <span key={name} style={{ display: 'contents' }}>
-                    <div className={`pipe-stage ${i === 2 ? 'is-bottleneck' : ''}`}>
-                      {name}
-                    </div>
-                    {i < 4 && <div className="pipe-arrow">›</div>}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="game-info">
-              <div className="game-tag">Concept: Theory of Constraints</div>
-              <h3>Bottleneck Buster</h3>
-              <p>
-                Identify which stage throttles your team's output. Spend your budget
-                wisely on upgrades — but beware, improving a non-bottleneck changes nothing.
-              </p>
-              <div className="game-meta">
-                <span>🕐 10–15 min</span>
-                <span>⭐⭐ Intermediate</span>
-              </div>
-              <Link to="/bottleneck" className="btn-play">Play Now →</Link>
-            </div>
-          </div>
-
-          {/* Flow */}
-          <div className="game-card">
-            <div className="game-preview">
-              <div className="flow-preview-wrap">
-                <div className="flow-lane-preview">
-                  <span className="flow-lane-label push">Push</span>
-                  <div className="flow-bar-track">
-                    <div className="flow-bar-fill push" />
-                  </div>
-                  <span className="flow-stat-preview">Q: 14</span>
-                </div>
-                <div className="flow-lane-preview">
-                  <span className="flow-lane-label pull">Pull</span>
-                  <div className="flow-bar-track">
-                    <div className="flow-bar-fill pull" />
-                  </div>
-                  <span className="flow-stat-preview">Q: 4</span>
-                </div>
-              </div>
-            </div>
-            <div className="game-info">
-              <div className="game-tag">Concept: Pull Principle</div>
-              <h3>Push vs Pull</h3>
-              <p>
-                Race a push-based delivery system against a pull-based one. See in real time
-                why pull creates smoother flow, smaller queues, and less waste.
-              </p>
-              <div className="game-meta">
-                <span>🕐 5–10 min</span>
-                <span>⭐ Beginner</span>
-              </div>
-              <Link to="/flow" className="btn-play">Play Now →</Link>
-            </div>
-          </div>
-
           {/* Pizza */}
           <div className="game-card">
             <div className="game-preview">
@@ -201,6 +94,61 @@ export default function Home() {
                 <span>⭐⭐ Intermediate</span>
               </div>
               <Link to="/pizza" className="btn-play">Play Now →</Link>
+            </div>
+          </div>
+
+          {/* Red Bead Experiment */}
+          <div className="game-card">
+            <div className="game-preview">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 6 }}>
+                {Array.from({ length: 20 }, (_, i) => (
+                  <div key={i} style={{
+                    width: 10, height: 10, borderRadius: '50%',
+                    background: i < 4 ? 'var(--rb-red, #e0473d)' : 'var(--text-muted, #64748b)',
+                    opacity: 0.85
+                  }} />
+                ))}
+              </div>
+            </div>
+            <div className="game-info">
+              <div className="game-tag">Concept: System Variation</div>
+              <h3>Red Bead Experiment</h3>
+              <p>
+                Deming's classic experiment: workers pull beads from a bin, but the system — not the
+                worker — determines outcomes. Proves that variation is in the system, not the people.
+              </p>
+              <div className="game-meta">
+                <span>🕐 10–20 min</span>
+                <span>⭐⭐ Intermediate</span>
+              </div>
+              <Link to="/red-bead" className="btn-play">Play Now →</Link>
+            </div>
+          </div>
+
+          {/* Scout Hike */}
+          <div className="game-card">
+            <div className="game-preview">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 10 }}>
+                {Array.from({ length: 8 }, (_, i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ECE7D7', opacity: 0.9 }} />
+                    <div style={{ width: 8, height: 14, borderRadius: 3, background: ['#C2A878','#9FB08A','#B7986A','#8FA7B0','#CBB488','#A98E5E','#B0826B','#97A36F'][i], opacity: 0.9 }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="game-info">
+              <div className="game-tag">Concept: Theory of Constraints · The Goal</div>
+              <h3>The Scout Hike</h3>
+              <p>
+                Pack weight sets the pace. The troop is only as fast as its slowest hiker —
+                share the load, manage the constraint, and subordinate everything else to the bottleneck.
+              </p>
+              <div className="game-meta">
+                <span>🕐 5–10 min</span>
+                <span>⭐ Beginner</span>
+              </div>
+              <Link to="/herbie-hike" className="btn-play">Play Now →</Link>
             </div>
           </div>
         </div>

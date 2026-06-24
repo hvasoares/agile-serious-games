@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { getBacklogOrders } from '../sim/orderSorting.js'
-import { computeScore } from '../sim/metrics.js'
+import { getBacklogOrders } from '../../sim/pizza/orderSorting.js'
+import { computeScore } from '../../sim/pizza/metrics.js'
 
 // ═══ STATION LAYOUT (matches reference: SPAN=22, 5 stations) ═══
 

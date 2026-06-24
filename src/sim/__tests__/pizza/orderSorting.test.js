@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getBacklogOrders, getDoingOrders, getDoneOrders } from '../orderSorting.js'
+import { getBacklogOrders, getDoingOrders, getDoneOrders } from '../../pizza/orderSorting.js'
 
 // ---------------------------------------------------------------------------
 // Builders

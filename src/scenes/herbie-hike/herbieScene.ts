@@ -305,6 +305,22 @@ export function createHerbieScene(
     const { legL, legR } = scoutParts[idx];
     const L = trailLength;
 
+    if (dist < 0) {
+      // Scout is queued behind the start gate — walk up the trail approach
+      const effectiveLat = lat * (slowestFront ? 0.22 : 1);
+      m.position.copy(startP).addScaledVector(startT, dist);
+      const rx = startT.z, rz = -startT.x, rl = Math.hypot(rx, rz) || 1;
+      m.position.x += (rx / rl) * effectiveLat;
+      m.position.z += (rz / rl) * effectiveLat;
+      m.position.y = 0;
+      m.lookAt(startP.x + startT.x * 10, 0, startP.z + startT.z * 10);
+      const ph = dist * 1.5;
+      const sw = Math.sin(ph) * 0.5;
+      legL.rotation.x = sw; legR.rotation.x = -sw;
+      m.position.y = Math.abs(Math.sin(ph)) * 0.06;
+      return;
+    }
+
     if (dist >= L && arrivedAt !== null) {
       const col = slot % 4, row = (slot / 4) | 0;
       m.position

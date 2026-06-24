@@ -5,7 +5,7 @@ import {
   SPAWN_INTERVAL,
   STATION_DURATIONS,
   isOrderReadyToDeliver,
-} from '../simConfig.js'
+} from '../../pizza/simConfig.js'
 
 // ---------------------------------------------------------------------------
 // Timing constants

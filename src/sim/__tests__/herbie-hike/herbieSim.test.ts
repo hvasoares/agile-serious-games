@@ -294,9 +294,11 @@ describe('newTroop', () => {
     expect(toggles.regroup).toBe(false);
   });
 
-  it('all scouts start at dist 0', () => {
-    const { scouts } = freshState();
-    for (const s of scouts) expect(s.dist).toBe(0);
+  it('scouts start staggered behind the gate — front scout at 0, rest at negative dist', () => {
+    const { scouts, line } = freshState();
+    for (let i = 0; i < line.length; i++) {
+      expect(scouts[line[i]].dist).toBeCloseTo(-i * TRAIL_GAP_OPEN);
+    }
   });
 
   it('trailLength is set from the argument', () => {
@@ -320,25 +322,28 @@ describe('setToggle', () => {
     for (const s of next.scouts) expect(s.dist).toBeCloseTo(15);
   });
 
-  it('slowestFront toggle resets all scout dists to 0', () => {
+  it('slowestFront toggle resets scouts to staggered starts (all ≤ 0)', () => {
     const state = { ...freshState(), scouts: freshState().scouts.map(s => ({ ...s, dist: 20 })) };
     const next = setToggle(state, 'slowestFront', true, always(0.5));
     expect(next.toggles.slowestFront).toBe(true);
-    for (const s of next.scouts) expect(s.dist).toBe(0);
+    for (const s of next.scouts) expect(s.dist).toBeLessThanOrEqual(0);
+    expect(next.scouts[next.line[0]].dist).toBeCloseTo(0);
   });
 
-  it('shareLoad toggle resets all scout dists to 0', () => {
+  it('shareLoad toggle resets scouts to staggered starts (all ≤ 0)', () => {
     const state = { ...freshState(), scouts: freshState().scouts.map(s => ({ ...s, dist: 30 })) };
     const next = setToggle(state, 'shareLoad', true, always(0.5));
     expect(next.toggles.shareLoad).toBe(true);
-    for (const s of next.scouts) expect(s.dist).toBe(0);
+    for (const s of next.scouts) expect(s.dist).toBeLessThanOrEqual(0);
+    expect(next.scouts[next.line[0]].dist).toBeCloseTo(0);
   });
 
-  it('regroup toggle resets all scout dists to 0', () => {
+  it('regroup toggle resets scouts to staggered starts (all ≤ 0)', () => {
     const state = { ...freshState(), scouts: freshState().scouts.map(s => ({ ...s, dist: 25 })) };
     const next = setToggle(state, 'regroup', true, always(0.5));
     expect(next.toggles.regroup).toBe(true);
-    for (const s of next.scouts) expect(s.dist).toBe(0);
+    for (const s of next.scouts) expect(s.dist).toBeLessThanOrEqual(0);
+    expect(next.scouts[next.line[0]].dist).toBeCloseTo(0);
   });
 });
 
@@ -350,9 +355,10 @@ describe('startRun', () => {
     expect(next.halts).toBe(0);
   });
 
-  it('resets all scout dists to 0', () => {
+  it('resets scouts to staggered starts (all ≤ 0, front of line at 0)', () => {
     const state = { ...freshState(), scouts: freshState().scouts.map(s => ({ ...s, dist: 50 })) };
     const next = startRun(state);
-    for (const s of next.scouts) expect(s.dist).toBe(0);
+    for (const s of next.scouts) expect(s.dist).toBeLessThanOrEqual(0);
+    expect(next.scouts[next.line[0]].dist).toBeCloseTo(0);
   });
 });

@@ -119,7 +119,13 @@ export function trailInfo(
 export function startRun(state: HikeState): HikeState {
   const { scouts: reweighted, theSlowestId } = applyWeights(state.scouts, state.pool, state.toggles);
   const line = buildLine(state.baseOrder, state.toggles, theSlowestId);
-  const scouts = reweighted.map(s => ({ ...s, dist: 0, arrivedAt: null, slot: -1 }));
+  const linePos = new Map(line.map((id, i) => [id, i]));
+  const scouts = reweighted.map(s => ({
+    ...s,
+    dist: -linePos.get(s.id)! * TRAIL_GAP_OPEN,
+    arrivedAt: null,
+    slot: -1,
+  }));
   return { ...state, scouts, line, theSlowestId, elapsed: 0, arrivedCount: 0, waiting: false, halts: 0 };
 }
 
@@ -193,6 +199,18 @@ export function step(state: HikeState, dt: number): HikeState {
         s.dist = L; s.arrivedAt = elapsed; s.slot = arrivedCount++;
       }
     }
+    // Enforce minimum visible gap on-trail: a slower scout must not crowd a faster one ahead.
+    // Faster scouts may pass (brief overlap allowed), but once passed the trailing scout falls back.
+    const onTrail = draft
+      .filter(s => s.dist >= 0 && s.dist < L)
+      .sort((a, b) => b.dist - a.dist);
+    for (let i = 1; i < onTrail.length; i++) {
+      const ahead = onTrail[i - 1];
+      const behind = onTrail[i];
+      if (behind.vel <= ahead.vel && behind.dist > ahead.dist - TRAIL_GAP_OPEN) {
+        behind.dist = Math.max(0, ahead.dist - TRAIL_GAP_OPEN);
+      }
+    }
   }
 
   const allIn = draft.every(s => s.dist >= L);
@@ -229,8 +247,9 @@ export function newTroop(rng: Rng, trailLength: number): HikeState {
   };
   const { scouts: weighted, theSlowestId } = applyWeights(scouts, pool, toggles);
   const line = buildLine(baseOrder, toggles, theSlowestId);
+  const linePos = new Map(line.map((id, i) => [id, i]));
   return {
-    scouts: weighted.map(s => ({ ...s, dist: 0, arrivedAt: null, slot: -1 })),
+    scouts: weighted.map(s => ({ ...s, dist: -linePos.get(s.id)! * TRAIL_GAP_OPEN, arrivedAt: null, slot: -1 })),
     baseOrder,
     line,
     herbieId,

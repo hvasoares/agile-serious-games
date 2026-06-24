@@ -9,9 +9,9 @@ export default function Nav() {
       </Link>
       <div className="nav-links">
         <NavLink to="/">Home</NavLink>
-        <NavLink to="/wip">WIP Limits</NavLink>
-        <NavLink to="/bottleneck">Bottleneck</NavLink>
-        <NavLink to="/flow">Flow</NavLink>
+        <NavLink to="/pizza">Pizzeria</NavLink>
+        <NavLink to="/red-bead">Red Bead</NavLink>
+        <NavLink to="/herbie-hike">Scout Hike</NavLink>
       </div>
     </nav>
   )

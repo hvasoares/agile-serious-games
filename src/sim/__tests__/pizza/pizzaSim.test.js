@@ -11,8 +11,8 @@ import {
   STATION_DEFS,
   ROUND_DEFS,
   TOC_STEPS,
-} from '../pizzaSim.js'
-import { SPAWN_INTERVAL } from '../simConfig.js'
+} from '../../pizza/pizzaSim.js'
+import { SPAWN_INTERVAL } from '../../pizza/simConfig.js'
 
 // ---------------------------------------------------------------------------
 // Helper — build minimal station arrays for unit testing detectConstraint,
@@ -736,8 +736,8 @@ describe('step — station utilization (busyTime / totalTime)', () => {
 describe('step — time limit', () => {
   it('finished is false before the time limit', () => {
     let state = freshSim(1)
-    // Run for 50s (below 60s limit)
-    for (let i = 0; i < 500; i++) state = step(state, 0.1)
+    // Run for 25s (below 30s limit)
+    for (let i = 0; i < 250; i++) state = step(state, 0.1)
     expect(state.finished).toBe(false)
   })
 
@@ -754,9 +754,9 @@ describe('step — time limit', () => {
     expect(freshSim(3).finished).toBe(false)
   })
 
-  it('timeLimit defaults to TIME_LIMIT (60s)', () => {
+  it('timeLimit defaults to TIME_LIMIT (30s)', () => {
     const state = freshSim(1)
-    expect(state.timeLimit).toBe(60)
+    expect(state.timeLimit).toBe(30)
   })
 })
 

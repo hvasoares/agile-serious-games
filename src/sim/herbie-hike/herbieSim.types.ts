@@ -3,8 +3,8 @@ export const N = 8;
 export const SPREAD_LIMIT = 25;
 export const TMIN = 32;
 export const TMAX = 86;
-export const VMAX = 4.6;
-export const VMIN = 1.5;
+export const VMAX = 8.0;
+export const VMIN = 4.0;
 export const TRAIL_GAP_OPEN = 2.0;
 export const TRAIL_GAP_REGROUP = 1.2;
 

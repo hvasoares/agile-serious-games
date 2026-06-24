@@ -1,5 +1,5 @@
 export const UNIT   = 2    // 1 unit = 2 000 ms = 2 seconds
-export const TIME_LIMIT = 60  // seconds per run
+export const TIME_LIMIT = 30  // seconds per run
 export const BAKE_X = 3
 
 export const SPAWN_INTERVAL = UNIT / 5

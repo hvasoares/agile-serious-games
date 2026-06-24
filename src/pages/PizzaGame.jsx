@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
 import GameLayout from '../components/GameLayout.jsx'
-import { PizzaScene } from '../scenes/pizzaScene.js'
+import { PizzaScene } from '../scenes/pizza/pizzaScene.js'
 import { usePizzaSim, getCoachingMessage } from '../hooks/usePizzaSim.js'
-import { ROUND_DEFS, TOC_STEPS, STATION_DEFS } from '../sim/pizzaSim.js'
-import { getBacklogOrders, getDoingOrders, getDoneOrders } from '../sim/orderSorting.js'
+import { ROUND_DEFS, TOC_STEPS, STATION_DEFS } from '../sim/pizza/pizzaSim.js'
+import { getBacklogOrders, getDoingOrders, getDoneOrders } from '../sim/pizza/orderSorting.js'
 import CfdChart from '../components/CfdChart.jsx'
 import LineChart from '../components/LineChart.jsx'
-import { computeScore } from '../sim/metrics.js'
+import { computeScore } from '../sim/pizza/metrics.js'
 
 const STATION_COLORS = ['#e0a24b', '#d8442a', '#e58aa6', '#caa05a', '#7cb342']
 
